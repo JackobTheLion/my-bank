@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: notifications
+  config:
+    import: "consul:"
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:consul}
+      port: ${CONSUL_PORT:8500}
+      config:
+        format: YAML
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          audiences:
+            - notifications
+
+server:
+  port: ${SERVER_PORT:8085}
+
+notifications:
+  logging:
+    enabled: ${NOTIFICATIONS_LOGGING_ENABLED:true}

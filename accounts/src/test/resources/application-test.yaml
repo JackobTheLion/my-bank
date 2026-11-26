@@ -1,0 +1,39 @@
+spring:
+  security:
+    oauth2:
+      client:
+        provider:
+          keycloak:
+            token-uri: http://localhost:8180/realms/my-bank/protocol/openid-connect/token
+        registration:
+          notifications:
+            provider: keycloak
+            authorization-grant-type: client_credentials
+            client-id: accounts
+            client-secret: test-notifications-secret
+            scope: notifications:write
+  cloud:
+    consul:
+      enabled: false
+      config:
+        enabled: false
+  datasource:
+    url: jdbc:h2:mem:accounts;MODE=PostgreSQL;INIT=CREATE SCHEMA IF NOT EXISTS ${accounts.database.schema}
+    username: sa
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: ${accounts.database.schema}
+  liquibase:
+    change-log: classpath:/db/db.changelog-master.xml
+    default-schema: ${accounts.database.schema}
+    liquibase-schema: ${accounts.database.schema}
+    parameters:
+      accountsSchema: ${accounts.database.schema}
+
+accounts:
+  notifications:
+    poll-delay: PT1H

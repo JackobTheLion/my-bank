@@ -1,0 +1,213 @@
+services:
+  consul:
+    image: hashicorp/consul:1.22.5
+    command:
+      - agent
+      - -server
+      - -bootstrap-expect=1
+      - -node=consul
+      - -client=0.0.0.0
+      - -ui
+      - -data-dir=/consul/data
+    ports:
+      - "127.0.0.1:8500:8500"
+    volumes:
+      - consul-data:/consul/data
+    healthcheck:
+      test: ["CMD", "consul", "operator", "raft", "list-peers"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  consul-init:
+    image: hashicorp/consul:1.22.5
+    depends_on:
+      consul:
+        condition: service_healthy
+    environment:
+      CONSUL_HTTP_ADDR: http://consul:8500
+    volumes:
+      - ./consul:/consul/kv:ro
+    working_dir: /consul/kv
+    entrypoint: ["/bin/sh", "./init-kv.sh"]
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: my_bank
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres-local}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres-local}
+      ACCOUNTS_DATABASE_SCHEMA: ${ACCOUNTS_DATABASE_SCHEMA:-accounts}
+      CASH_DATABASE_SCHEMA: ${CASH_DATABASE_SCHEMA:-cash}
+      FRONT_UI_DATABASE_SCHEMA: ${FRONT_UI_DATABASE_SCHEMA:-front_ui}
+      GATEWAY_DATABASE_SCHEMA: ${GATEWAY_DATABASE_SCHEMA:-gateway}
+      KEYCLOAK_DB_SCHEMA: ${KEYCLOAK_DB_SCHEMA:-keycloak}
+      NOTIFICATIONS_DATABASE_SCHEMA: ${NOTIFICATIONS_DATABASE_SCHEMA:-notifications}
+      TRANSFER_DATABASE_SCHEMA: ${TRANSFER_DATABASE_SCHEMA:-transfer}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "${POSTGRES_USER:-postgres}", "-d", "my_bank"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.2
+    command: ["start-dev", "--import-realm"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/my_bank
+      KC_DB_USERNAME: ${POSTGRES_USER:-postgres}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres-local}
+      KC_DB_SCHEMA: ${KEYCLOAK_DB_SCHEMA:-keycloak}
+      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_URL:-http://keycloak.localhost:8180}
+      KC_HTTP_PORT: "8180"
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: keycloak-admin-local
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "127.0.0.1:8180:8180"
+    networks:
+      default:
+        aliases:
+          - keycloak.localhost
+    volumes:
+      - ./keycloak/my-bank-realm.json:/opt/keycloak/data/import/my-bank-realm.json:ro
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -ec
+        - >-
+          { printf 'HEAD /health/ready HTTP/1.0\r\n\r\n' >&0; grep -q '^HTTP/1\.0 200 '; } 0<>/dev/tcp/127.0.0.1/9000
+      interval: 5s
+      timeout: 3s
+      retries: 24
+
+  notifications:
+    build:
+      context: .
+      dockerfile: notifications/Dockerfile
+    depends_on:
+      consul-init:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_healthy
+    environment:
+      CONSUL_HOST: ${CONSUL_HOST:-consul}
+      CONSUL_PORT: ${CONSUL_PORT:-8500}
+      SPRING_CLOUD_CONSUL_DISCOVERY_HOSTNAME: notifications
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-${KEYCLOAK_PUBLIC_URL:-http://keycloak.localhost:8180}/realms/my-bank}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8180/realms/my-bank/protocol/openid-connect/certs}
+
+  accounts:
+    build:
+      context: .
+      dockerfile: accounts/Dockerfile
+    depends_on:
+      consul-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      notifications:
+        condition: service_started
+    environment:
+      CONSUL_HOST: ${CONSUL_HOST:-consul}
+      CONSUL_PORT: ${CONSUL_PORT:-8500}
+      SPRING_CLOUD_CONSUL_DISCOVERY_HOSTNAME: accounts
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/my_bank
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres-local}
+      ACCOUNTS_DATABASE_SCHEMA: ${ACCOUNTS_DATABASE_SCHEMA:-accounts}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-${KEYCLOAK_PUBLIC_URL:-http://keycloak.localhost:8180}/realms/my-bank}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8180/realms/my-bank/protocol/openid-connect/certs}
+      KEYCLOAK_TOKEN_URI:
+      ACCOUNTS_NOTIFICATION_CLIENT_SECRET: accounts-notifications-local
+    ports:
+      - "8082:8082"
+
+  cash:
+    build:
+      context: .
+      dockerfile: cash/Dockerfile
+    depends_on:
+      consul-init:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_healthy
+      accounts:
+        condition: service_started
+    environment:
+      CONSUL_HOST: ${CONSUL_HOST:-consul}
+      CONSUL_PORT: ${CONSUL_PORT:-8500}
+      SPRING_CLOUD_CONSUL_DISCOVERY_HOSTNAME: cash
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-${KEYCLOAK_PUBLIC_URL:-http://keycloak.localhost:8180}/realms/my-bank}
+      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8180/realms/my-bank/protocol/openid-connect/certs}
+      KEYCLOAK_TOKEN_URI: ${KEYCLOAK_TOKEN_URI:-http://keycloak:8180/realms/my-bank/protocol/openid-connect/token}
+      CASH_ACCOUNTS_CLIENT_SECRET: cash-accounts-local
+
+  transfer:
+    build:
+      context: .
+      dockerfile: transfer/Dockerfile
+    depends_on:
+      consul-init:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_healthy
+      accounts:
+        condition: service_started
+    environment:
+      CONSUL_HOST: ${CONSUL_HOST:-consul}
+      CONSUL_PORT: ${CONSUL_PORT:-8500}
+      SPRING_CLOUD_CONSUL_DISCOVERY_HOSTNAME: transfer
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-${KEYCLOAK_PUBLIC_URL:-http://keycloak.localhost:8180}/realms/my-bank}
+      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8180/realms/my-bank/protocol/openid-connect/certs}
+      KEYCLOAK_TOKEN_URI: ${KEYCLOAK_TOKEN_URI:-http://keycloak:8180/realms/my-bank/protocol/openid-connect/token}
+      TRANSFER_ACCOUNTS_CLIENT_SECRET: transfer-accounts-local
+
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    depends_on:
+      consul-init:
+        condition: service_completed_successfully
+      accounts:
+        condition: service_started
+      cash:
+        condition: service_started
+      transfer:
+        condition: service_started
+    environment:
+      CONSUL_HOST: ${CONSUL_HOST:-consul}
+      CONSUL_PORT: ${CONSUL_PORT:-8500}
+      SPRING_CLOUD_CONSUL_DISCOVERY_HOSTNAME: gateway
+    ports:
+      - "8081:8081"
+
+  front-ui:
+    build:
+      context: .
+      dockerfile: front-ui/Dockerfile
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      gateway:
+        condition: service_started
+    environment:
+      GATEWAY_BASE_URL: http://gateway:8081
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-${KEYCLOAK_PUBLIC_URL:-http://keycloak.localhost:8180}/realms/my-bank}
+      KEYCLOAK_FRONT_UI_CLIENT_SECRET: front-ui-local
+    ports:
+      - "127.0.0.1:8080:8080"
+
+volumes:
+  consul-data:
+  postgres-data:

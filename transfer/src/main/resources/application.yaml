@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: transfer
+  config:
+    import: "consul:"
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:consul}
+      port: ${CONSUL_PORT:8500}
+      config:
+        format: YAML
+      discovery:
+        query-passing: true
+    loadbalancer:
+      cache:
+        enabled: false
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak.localhost:8180/realms/my-bank}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:${spring.security.oauth2.resourceserver.jwt.issuer-uri}/protocol/openid-connect/certs}
+          audiences:
+            - transfer
+      client:
+        provider:
+          keycloak:
+            token-uri: ${KEYCLOAK_TOKEN_URI:${spring.security.oauth2.resourceserver.jwt.issuer-uri}/protocol/openid-connect/token}
+        registration:
+          transfer:
+            provider: keycloak
+            authorization-grant-type: client_credentials
+            client-id: ${TRANSFER_ACCOUNTS_CLIENT_ID:transfer}
+            client-secret: ${TRANSFER_ACCOUNTS_CLIENT_SECRET}
+            scope:
+              - accounts:transfer
+              - notifications:write
+
+server:
+  port: ${SERVER_PORT:8084}

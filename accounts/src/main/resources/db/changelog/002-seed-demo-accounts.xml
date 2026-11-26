@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                                       http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.31.xsd">
+
+    <changeSet id="002-seed-demo-accounts" author="my-bank">
+        <insert schemaName="${accountsSchema}" tableName="account">
+            <column name="login" value="ivanov"/>
+            <column name="name" value="Иванов Иван"/>
+            <column name="birth_date" valueDate="2001-01-01"/>
+            <column name="balance" valueNumeric="100"/>
+        </insert>
+        <insert schemaName="${accountsSchema}" tableName="account">
+            <column name="login" value="petrov"/>
+            <column name="name" value="Петров Пётр"/>
+            <column name="birth_date" valueDate="1998-05-12"/>
+            <column name="balance" valueNumeric="250"/>
+        </insert>
+        <rollback/>
+    </changeSet>
+</databaseChangeLog>

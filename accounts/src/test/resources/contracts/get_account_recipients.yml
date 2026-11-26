@@ -1,0 +1,17 @@
+description: Returns the recipients available to the authenticated user
+request:
+  method: GET
+  url: /accounts/recipients
+  headers:
+    Authorization: Bearer accounts-contract-token
+  matchers:
+    headers:
+      - key: Authorization
+        regex: 'Bearer [^\s]+'
+response:
+  status: 200
+  headers:
+    Content-Type: application/json
+  body:
+    - login: petrov
+      name: Петров Пётр

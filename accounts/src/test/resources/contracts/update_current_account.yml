@@ -1,0 +1,23 @@
+description: Updates the profile of the authenticated user
+request:
+  method: PUT
+  url: /accounts/me
+  headers:
+    Authorization: Bearer accounts-contract-token
+    Content-Type: application/json
+  matchers:
+    headers:
+      - key: Authorization
+        regex: 'Bearer [^\s]+'
+  body:
+    name: Иванов Иван Иванович
+    birthDate: '1999-04-01'
+response:
+  status: 200
+  headers:
+    Content-Type: application/json
+  body:
+    login: ivanov
+    name: Иванов Иван Иванович
+    birthDate: '1999-04-01'
+    balance: 100

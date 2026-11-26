@@ -1,0 +1,19 @@
+description: Returns the account of the authenticated user
+request:
+  method: GET
+  url: /accounts/me
+  headers:
+    Authorization: Bearer accounts-contract-token
+  matchers:
+    headers:
+      - key: Authorization
+        regex: 'Bearer [^\s]+'
+response:
+  status: 200
+  headers:
+    Content-Type: application/json
+  body:
+    login: ivanov
+    name: Иванов Иван
+    birthDate: '2001-01-01'
+    balance: 100

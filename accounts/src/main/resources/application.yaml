@@ -1,0 +1,50 @@
+spring:
+  application:
+    name: accounts
+  config:
+    import: "consul:"
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:consul}
+      port: ${CONSUL_PORT:8500}
+      config:
+        format: YAML
+      discovery:
+        query-passing: true
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: ${accounts.database.schema}
+  liquibase:
+    change-log: classpath:/db/db.changelog-master.xml
+    default-schema: ${accounts.database.schema}
+    liquibase-schema: ${accounts.database.schema}
+    parameters:
+      accountsSchema: ${accounts.database.schema}
+  security:
+    oauth2:
+      client:
+        provider:
+          keycloak:
+            token-uri: ${KEYCLOAK_TOKEN_URI:http://keycloak:8180/realms/my-bank/protocol/openid-connect/token}
+        registration:
+          notifications:
+            provider: keycloak
+            authorization-grant-type: client_credentials
+            client-id: ${ACCOUNTS_NOTIFICATION_CLIENT_ID:accounts}
+            client-secret: ${ACCOUNTS_NOTIFICATION_CLIENT_SECRET}
+            scope: notifications:write
+      resourceserver:
+        jwt:
+          audiences:
+            - accounts
+
+server:
+  port: ${SERVER_PORT:8082}
+
+accounts:
+  database:
+    schema: ${ACCOUNTS_DATABASE_SCHEMA:accounts}
