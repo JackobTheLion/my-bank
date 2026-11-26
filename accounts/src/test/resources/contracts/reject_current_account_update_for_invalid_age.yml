@@ -1,0 +1,21 @@
+description: Rejects a date of birth that does not meet the age requirement
+request:
+  method: PUT
+  url: /accounts/me
+  headers:
+    Authorization: Bearer accounts-contract-token
+    Content-Type: application/json
+  matchers:
+    headers:
+      - key: Authorization
+        regex: 'Bearer [^\s]+'
+  body:
+    name: Иванов Иван Иванович
+    birthDate: '2099-01-01'
+response:
+  status: 400
+  headers:
+    Content-Type: application/problem+json
+  body:
+    status: 400
+    detail: Account holder must be older than 18

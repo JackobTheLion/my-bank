@@ -1,0 +1,22 @@
+description: Rejects a cash withdrawal when the account has insufficient funds
+request:
+  method: POST
+  url: /internal/accounts/cash-operations
+  headers:
+    Authorization: Bearer accounts-cash-contract-token
+    Content-Type: application/json
+  matchers:
+    headers:
+      - key: Authorization
+        regex: 'Bearer [^\s]+'
+  body:
+    login: ivanov
+    action: WITHDRAW
+    amount: 101
+response:
+  status: 409
+  headers:
+    Content-Type: application/problem+json
+  body:
+    status: 409
+    detail: Insufficient funds

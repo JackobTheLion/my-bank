@@ -1,0 +1,21 @@
+description: Transfers funds and returns the sender's new balance
+request:
+  method: POST
+  url: /internal/accounts/transfers
+  headers:
+    Authorization: Bearer accounts-transfer-contract-token
+    Content-Type: application/json
+  matchers:
+    headers:
+      - key: Authorization
+        regex: 'Bearer [^\s]+'
+  body:
+    senderLogin: ivanov
+    recipientLogin: petrov
+    amount: 40
+response:
+  status: 200
+  headers:
+    Content-Type: application/json
+  body:
+    balance: 60

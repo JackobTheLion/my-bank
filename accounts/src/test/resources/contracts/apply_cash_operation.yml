@@ -1,0 +1,21 @@
+description: Deposits cash and returns the new account balance
+request:
+  method: POST
+  url: /internal/accounts/cash-operations
+  headers:
+    Authorization: Bearer accounts-cash-contract-token
+    Content-Type: application/json
+  matchers:
+    headers:
+      - key: Authorization
+        regex: 'Bearer [^\s]+'
+  body:
+    login: ivanov
+    action: DEPOSIT
+    amount: 25
+response:
+  status: 200
+  headers:
+    Content-Type: application/json
+  body:
+    balance: 125

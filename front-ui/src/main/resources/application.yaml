@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: front-ui
+  security:
+    oauth2:
+      client:
+        registration:
+          keycloak:
+            provider: keycloak
+            client-id: front-ui
+            client-secret: ${KEYCLOAK_FRONT_UI_CLIENT_SECRET:front-ui-local}
+            client-authentication-method: client_secret_basic
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope:
+              - openid
+              - accounts:read
+              - accounts:write
+              - cash:write
+              - transfer:write
+            client-name: Keycloak
+        provider:
+          keycloak:
+            issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak.localhost:8180/realms/my-bank}
+            user-name-attribute: sub
+
+server:
+  port: ${SERVER_PORT:8080}
+
+gateway:
+  base-url: ${GATEWAY_BASE_URL:http://localhost:8081}
